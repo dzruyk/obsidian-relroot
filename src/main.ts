@@ -141,6 +141,9 @@ class PathMap {
     return null;
   }
   onCreate(file: TAbstractFile) {
+    if (!this.plugin.app.workspace.layoutReady) {
+      return;
+    }
     console.log(`create callback ${this}`);
     const basePath = this.getBasePath(file.path)
     if (basePath !== null) {
@@ -202,8 +205,9 @@ export default class RelRootPlugin extends Plugin {
     this.hooksUnregLst.push(uninstaller);
     if (this.pathMap !== null) {
       this.registerEvent(this.app.vault.on('rename', this.pathMap.onRename.bind(this.pathMap)));
+      this.registerEvent(this.app.vault.on('create', this.pathMap.onCreate.bind(this.pathMap)));
+      this.registerEvent(this.app.vault.on('delete', this.pathMap.onDelete.bind(this.pathMap)));
     }
-    this.registerEvent(this.app.vault.on('delete', this.pathMap.onDelete.bind(this.pathMap)));
     // const activeFile = this.app.workspace.getActiveFile();
 
     /*
