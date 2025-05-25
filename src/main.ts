@@ -247,10 +247,14 @@ export default class RelRootPlugin extends Plugin {
 
 class RelRootSettingsTab extends PluginSettingTab {
   plugin: RelRootPlugin;
+  lastEdit: number;
+  modified: boolean;
 
   constructor(app: App, plugin: RelRootPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+    this.lastEdit = 0;
+    this.modified = false;
   }
 
   display(): void {
@@ -266,7 +270,20 @@ class RelRootSettingsTab extends PluginSettingTab {
         .setValue(this.plugin.settings.pathMapList)
         .onChange(async (value) => {
           this.plugin.settings.pathMapList = value;
-          await this.plugin.saveSettings();
+
+          this.lastEdit = Date.now();
+          this.modified = true;
+
+          setTimeout(() => {
+            if (!this.modified)
+              return;
+            let now = Date.now();
+            if ((now - this.lastEdit) / 1000 > 4) {
+              this.plugin.saveSettings();
+              this.modified = false;
+            }
+          }, 5000);
+
         }));
   }
 }
