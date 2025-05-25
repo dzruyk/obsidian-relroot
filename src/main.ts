@@ -46,6 +46,9 @@ class PathMap {
     let out = new Map<string, string>();
 
     arr.forEach((ln: string) => {
+      if (!ln.endsWith("/")) {
+        ln = ln.replace(/\/+$/, "")
+      }
       out.set(ln, ln);
     })
     return new PathMap(out, plugin);
@@ -103,20 +106,13 @@ class PathMap {
         if (basePath === null)
           return origFunction();
 
-        /*
-        if (isRelativePath(argTgtFile)) {
-          const tmp = metadataCache.getFileSuggestions(basePath, argTgtFile);
-          if (tmp !== null) {
-            return this.plugin.app.vault.getFileByPath(tmp);
-          }
-        } else 
-        */
         if (isFileName(argTgtFile)) {
           const tmp = this.getPathFromLinkFileName(basePath, argTgtFile);
           if (tmp !== null) {
             const filePath = this.plugin.app.vault.getFileByPath(tmp);
             if (filePath !== null)
               return filePath;
+            //TODO: create new file?
             return origFunction();
           }
         }
@@ -127,6 +123,7 @@ class PathMap {
         tmp = this.plugin.app.vault.getFileByPath(myRealpath(`${basePath}/${argTgtFile}.md`));
         if (tmp !== null)
           return tmp;
+        //TODO: create new file?
         return origFunction();
   }
 
@@ -136,13 +133,21 @@ class PathMap {
 
     //TODO: multinesting?
     for (const [key, value] of this.dirToBasedir) {
-      if (fpath.startsWith(key)) {
+      //keep last slash to avoid false positives
+      if (fpath.startsWith(key + "/")) {
         return value;
       }
     }
     return null;
   }
-
+  onCreate(file: TAbstractFile) {
+    console.log(`create callback ${this}`);
+    const basePath = this.getBasePath(file.path)
+    if (basePath !== null) {
+      const ftp = this.fileNamesMap.get(basePath);
+      ftp!.set(file.name, file.path);
+    }
+  }
   onRename(file: TAbstractFile, oldPath: string) {
     console.log(`rename callback ${this}`);
     let basePath = this.getBasePath(oldPath);
@@ -155,6 +160,14 @@ class PathMap {
     if (basePath !== null) {
       const ftp = this.fileNamesMap.get(basePath);
       ftp!.set(file.name, file.path);
+    }
+  }
+  onDelete(file: TAbstractFile) {
+    console.log(`delete callback ${this}`);
+    const basePath = this.getBasePath(file.path)
+    if (basePath !== null) {
+      const ftp = this.fileNamesMap.get(basePath);
+      ftp!.del(file.name);
     }
   }
 }
@@ -188,9 +201,9 @@ export default class RelRootPlugin extends Plugin {
     });
     this.hooksUnregLst.push(uninstaller);
     if (this.pathMap !== null) {
-      this.registerEvent(this.app.vault.on('rename', this.pathMap.onRename));
+      this.registerEvent(this.app.vault.on('rename', this.pathMap.onRename.bind(this.pathMap)));
     }
-    //this.registerEvent(this.app.vault.on('delete', this.handleFileDelete.bind(this)));
+    this.registerEvent(this.app.vault.on('delete', this.pathMap.onDelete.bind(this.pathMap)));
     // const activeFile = this.app.workspace.getActiveFile();
 
     /*
