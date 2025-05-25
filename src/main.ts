@@ -1,7 +1,7 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, TFile } from 'obsidian';
 import { normalizePath } from 'obsidian';
 import { around } from 'monkey-around';
-import { filesRecursePassCb, isFileName, isRelativePath, myRealpath } from './util';
+import { filesRecursePassCb, isFileName, isRelativePath, myRealpath, splitPath } from './util';
 
 interface RelRootPluginSettings {
   pathMapList: string
@@ -88,7 +88,7 @@ class PathMap {
     }
   }
 
-  resolve(metadataCacheThis: any, args:any, origFunction: any) {
+  resolve(metadataCache: any, args:any, origFunction: any) {
     let argTgtFile: string = args[0];
     let srcFile: string = args[1];
         if (srcFile == "") {
@@ -103,11 +103,15 @@ class PathMap {
         if (basePath === null)
           return origFunction();
 
+        /*
         if (isRelativePath(argTgtFile)) {
-          const tmp = metadataCacheThis.getFileLinksCache(basePath, argTgtFile);
-          if (tmp !== null)
+          const tmp = metadataCache.getFileSuggestions(basePath, argTgtFile);
+          if (tmp !== null) {
             return this.plugin.app.vault.getFileByPath(tmp);
-        } else if (isFileName(argTgtFile)) {
+          }
+        } else 
+        */
+        if (isFileName(argTgtFile)) {
           const tmp = this.getPathFromLinkFileName(basePath, argTgtFile);
           if (tmp !== null) {
             const filePath = this.plugin.app.vault.getFileByPath(tmp);
@@ -138,6 +142,21 @@ class PathMap {
     }
     return null;
   }
+
+  onRename(file: TAbstractFile, oldPath: string) {
+    console.log(`rename callback ${this}`);
+    let basePath = this.getBasePath(oldPath);
+    if (basePath !== null) {
+      const ftp = this.fileNamesMap.get(basePath);
+      const pi = splitPath(oldPath)
+      ftp!.del(pi.fileName);
+    }
+    basePath = this.getBasePath(file.path)
+    if (basePath !== null) {
+      const ftp = this.fileNamesMap.get(basePath);
+      ftp!.set(file.name, file.path);
+    }
+  }
 }
 
 export default class RelRootPlugin extends Plugin {
@@ -150,21 +169,6 @@ export default class RelRootPlugin extends Plugin {
     await this.loadSettings();
 
     this.pathMap = PathMap.parseFromStr(this.settings.pathMapList, this);
-    /*
-    this.pathMap = new PathMap(new Map([
-      ["test", "test"]
-    ]));
-    */
-
-    /*
-    this.registerEvent(this.app.workspace.on('file-open', (file: TFile | null) => {
-      console.log('file-open');
-      console.log(file.path);
-    }));
-    */
-    //this.registerEvent(this.app.vault.on('rename', this.handleFileRename.bind(this)));
-    //this.registerEvent(this.app.vault.on('delete', this.handleFileDelete.bind(this)));
-    // const activeFile = this.app.workspace.getActiveFile();
 
     let plugin = this;
     let uninstaller = around(this.app.metadataCache, {
@@ -183,6 +187,11 @@ export default class RelRootPlugin extends Plugin {
       }
     });
     this.hooksUnregLst.push(uninstaller);
+    if (this.pathMap !== null) {
+      this.registerEvent(this.app.vault.on('rename', this.pathMap.onRename));
+    }
+    //this.registerEvent(this.app.vault.on('delete', this.handleFileDelete.bind(this)));
+    // const activeFile = this.app.workspace.getActiveFile();
 
     /*
     around(this.app.workspace, {

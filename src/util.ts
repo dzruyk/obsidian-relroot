@@ -1,5 +1,33 @@
 import { TFolder, TAbstractFile } from 'obsidian';
 
+interface PathInfo {
+  dirPath: string;
+  fileName: string;
+  extension: string;
+}
+
+export function splitPath(filePath: string): PathInfo {
+  const lastDashIdx = filePath.lastIndexOf("/");
+  let dirName = "";
+  let fileName = filePath;
+  if (lastDashIdx >= 0) {
+    dirName = filePath.substring(0, lastDashIdx);
+    fileName = filePath.substring(lastDashIdx - 1, filePath.length);
+  }
+  let ext = "";
+  const idx = fileName.lastIndexOf(".")
+  if (idx >= 0) {
+    ext = fileName.substring(idx);
+  }
+
+  return {
+    dirPath: dirName,
+    fileName: fileName,
+    extension: ext
+  }
+}
+
+
 export function myRealpath(path: string): string {
   path = path.trim();
   const segments = path.split('/');
